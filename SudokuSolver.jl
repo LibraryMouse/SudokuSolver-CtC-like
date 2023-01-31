@@ -1,5 +1,7 @@
 module Tmp
 
+# STRUCTS #
+
 
 struct Cell
     candidates::Vector{Bool}
@@ -13,19 +15,7 @@ struct Sudoku
 end
 
 
-function setcellvalue(Cell, value)
-    fill!(Cell.candidates, false)
-    Cell.candidates[value] = true
-    return Cell
-end
-
-
-function setemptygrid(Sudoku)
-    for column in 1:9, row in 1:9
-        Sudoku.grid[column, row] = Cell()
-    end
-    return Sudoku
-end
+# BASIC DEFINITIONS #
 
 
 function iscellbroken(Cell)
@@ -46,8 +36,47 @@ function iscellsolved(Cell)
 end
 
 
+function setcellvalue(Cell, value)
+    fill!(Cell.candidates, false)
+    Cell.candidates[value] = true
+    return Cell
+end
+
+
+function setemptygrid(Sudoku)
+    for column in 1:9, row in 1:9
+        Sudoku.grid[column, row] = Cell()
+    end
+    return Sudoku
+end
+
+
+function row(Sudoku)
+end
+
+function row(Sudoku.grid.Cell)
+    return
+end
+
+function column(Sudoku)
+end
+
+function column(Cell)
+end
+
+function box(Sudoku)
+end
+
+function box(Cell)
+end
+
+
+
+# PRINTING FUNCTIONS #
+
+
 function printcell(Cell)
-    digitofcell = "?"
+    digitofcell = "."
     if iscellbroken(Cell) == true
         digitofcell = "!"
     elseif iscellsolved(Cell) == true
@@ -173,6 +202,9 @@ function printgridstate(Sudoku)
 end
 
 
+# SUDOKU FOR TESTS #
+
+
 function getmesomegas(gasname)
     gas21 = "
     000 000 000
@@ -187,40 +219,105 @@ function getmesomegas(gasname)
     045 067 890
     000 000 000
     "
-    gas2 = ""
-    gas3 = ""
-    gaslist = ["gas21", "gas2", "gas3"]
+    gas40 = "
+    +-----------+
+    |...|123|...|
+    |..2|...|4..|
+    |.1.|4..|.5.|
+    |---+---+---|
+    |2.5|.7.|..6|
+    |3..|842|..7|
+    |4..|.6.|9.8|
+    |---+---+---|
+    |.5.|..6|.9.|
+    |..6|...|8..|
+    |...|789|...|
+    +-----------+
+    "
+    gas90 = "
+    1?2 ?3? 4?5
+    ??? 6?? ???
+    7?? ??8 ??6
+
+    ??9 ??? ?2?
+    6?? ??? ??7
+    ?7? ??? 3??
+
+    5?? 7?? ??8
+    ??? ??9 ???
+    4?3 ?2? 1?9
+    "
+    gaslist = ["gas21", "gas40", "gas90"]
     if gasname == "gas21"
         return gas21
-    elseif gasname == "gas2"
-        return gas2
-    elseif gasname == "gas3"
-        return gas3
+    elseif gasname == "gas40"
+        return gas40
+    elseif gasname == "gas90"
+        return gas90
     else
         return "I do not have Genuinely Approachable Sudoku you are asking for"
     end
 end
 
 
-function setgrid(gridstring::AbstractString)
-    somegrid = Sudoku()
+# STRING TO GRID, GRID TO STRING #
+
+
+function simplifygridstring(gridstring::AbstractString)
     cellcount = 0
     digits = "123456789"
     emptycells = ".?0"
-    noncells = "|- _+
-    ="
     for char in gridstring
         if occursin(char, digits)
             cellcount += 1
         elseif occursin(char, emptycells)
             gridstring = replace(gridstring, char => "?")
             cellcount += 1
-        elseif 
-            grindstring = replace(grindstring, char => "")
+        else 
+            gridstring = replace(gridstring, char => "")
         end
     end
-    return somegrid
+    if cellcount < 81
+        return "Sorry, not enough cells for a Sudoku."
+    elseif cellcount > 81
+        return "Sorry, too much cells for a Sudoku."
+    else
+        return gridstring
+    end
 end
+
+
+function gridifystring(gridstring::AbstractString)
+    somesudoku = Sudoku()
+    somesudoku = setemptygrid(somesudoku)
+    gridstring = simplifygridstring(gridstring)
+    for r in 1:9, c in 1:9
+        currentcell = somesudoku.grid[r, c]
+        currentdigit = gridstring[(r-1)*9+c]
+        if occursin(currentdigit, "123456789")
+            value = parse(Int64, currentdigit)
+            currentcell = setcellvalue(currentcell, value)
+        end
+    end
+    return somesudoku
+end
+
+
+function stringifygrid(Sudoku)
+    gridstring = "?"^81
+    for r in 1:9, c in 1:9
+        currentcell = Sudoku.grid[r, c]
+        currentdigit = gridstring[(r-1)*9+c]
+        if iscellsolved(currentcell)
+            value = findfirst(isequal(true), currentcell.candidates)
+            replace(grindstring, currentdigit => value)
+        end
+    return gridstring
+end
+
+
+# FUNCTIONS OF ELEGANT SOLVING
+
 
 
 end #end of module
