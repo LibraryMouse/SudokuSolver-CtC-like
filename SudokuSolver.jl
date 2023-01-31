@@ -318,6 +318,90 @@ end
 
 # FUNCTIONS OF ELEGANT SOLVING
 
+function findnakedsingle(Sudoku)
+    for r in 1:9, c in 1:9
+        if iscellsolved(Sudoku.grid[r, c])
+            digit = findfirst(isequal(true), Sudoku.grid[r, c])
+            # generate list of Peers of Cell Sudoku.grid[r, c])
+            # for every PeerCell set candidates[value] as false
+        end
+    end
+    return Sudoku
+end
+
+
+function findhiddensingle(Sudoku)
+    for #every unit in this Sudoku
+        for digit in 1:9
+            placesfordigit = 0
+            for # everycell in this unit
+                if Cell.candidates[digit] == true
+                    placesfordigit += 1
+                end
+            end
+            if placesfordigit == 1
+                hiddensingle = #Cell where candidates[digit]== true
+                hiddensingle = setcellvalue(hiddensingle, digit)
+                # generate list of Peers of hidden single Cell
+                # for every PeerCell set candidates[value] as false
+            end
+        end
+    end
+    return Sudoku
+end
+
+
+function findnakedpair(Sudoku)
+    for #every unit in this Sudoku
+        if # there is a cell with exactly 2 candidates
+            # mark this cell as possible pair
+            if # there is another cell which has exactly the same set as first
+                # mark this cell as part of pair
+                # delete pair values from every other cell in unit
+            end
+        end
+    end
+    return Sudoku
+end
+
+
+function findhiddenpair(Sudoku)
+    for #every unit in this Sudoku
+        if # there is a digit with exactly two possible places
+            if # there is a second digit also with exactly two possible places
+                if # their places are the same places
+                    # mark these two digits as a hidden pair
+                    # delete every other candidate from their cells
+                end
+            end
+        end
+    end
+    return Sudoku
+end
+
+
+function exhaustmethod(Sudoku, method)
+    before = Sudoku
+    after = nothing
+    swap = nothing
+    while before != after
+        after = method(before)
+        swap = after
+        after = nothing
+        before = swap
+        swap = nothing
+    end
+    return after
+end
+
+
+function solveelegant(Sudoku)
+    exhaustmethod(Sudoku, findnakedsingle)
+    exhaustmethod(Sudoku, findhiddensingle)
+    exhaustmethod(Sudoku, findnakedpair)
+    exhaustmethod(Sudoku, findhiddenpair)
+end
+
 
 
 end #end of module
