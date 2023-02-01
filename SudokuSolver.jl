@@ -508,21 +508,50 @@ function seekhiddensingle(sudoku)
 end
 
 
-function findhiddensingle(Sudoku)
-    for digit in 1:9
-        for unit in everyunit(Sudoku)
-            places = placesfordigit(unit, digit)
-            if length(places) == 1 && count(unit[places[1]].candidates) > 1
-                hiddensingle = unit[places[1]]
-                hiddensingle = setsolvedvalue(hiddensingle, digit)
-                println("found hidden single")
-                for peer in peers(Sudoku, hiddensingle)
-                    peer.candidates[digit] = false
+function isitnakedpair(cell1, cell2)
+    if cell1 != cell2 && alloweddigits(cell1) == alloweddigits(cell2) &&
+        length(alloweddigits(cell1)) == 2
+        return true
+    else
+        return false
+    end
+end
+
+
+function isnewnakedpair(unit, cell1, cell2)
+    digits = alloweddigits(cell1)
+    if length(placesfordigit(unit, digits[1])) > 2
+        return true
+    elseif length(placesfordigit(unit, digits[2])) > 2
+        return true
+    else
+        return false
+    end
+end
+
+
+function updatenakedpair(unit, cell1, cell2)
+    digits = alloweddigits(cell1)
+    for cell in unit
+        if cell != cell1 && cell != cell2
+            cell.candidates[digits[1]] = false
+            cell.candidates[digits[2]] = false
+        end
+    end
+end
+
+
+function seeknakedpair(sudoku)
+    for unit in everyunit(sudoku)
+        for i=1:9, j=1:9
+            if i != j && i < j
+                if isitnakedpair(unit[i], unit[j]) == true &&
+                    isnewnakedpair(unit, unit[i], unit[j]) == true
+                    updatenakedpair(unit, unit[i], unit[j])
                 end
             end
         end
     end
-    return Sudoku
 end
 
 
@@ -544,6 +573,17 @@ function findnakedpair(Sudoku)
 
     end
     return Sudoku
+end
+
+
+function isithiddenpair(unit, digit1, digit2)
+    if digit1 != digit2 && 
+        placesfordigit(unit, digit1) == placesfordigit(unit, digit2) &&
+        length(placesfordigit(unit, digit1)) == 2
+        return true
+    else
+        return false
+    end
 end
 
 
@@ -572,8 +612,8 @@ function solveelegant(sudoku)
         while i == 0 && still == before
             seekhiddensingle(sudoku)
             still = freedomdegree(sudoku)
-            # try nakedpair
-            # still = freedomdegree(sudoku)
+            seeknakedpair(sudoku)
+            still = freedomdegree(sudoku)
             # tryhiddenpair
             # still = freedomdegree(sudoku)
             # tryxwing
