@@ -1,5 +1,11 @@
 module Tmp
 
+export Cell, Sudoku,
+row, column, box, everyunit, peers,
+iscellbroken, placesfordigit, alloweddigits, isdigitinset, iscellsolved, setsolvedvalue, setemptygrid,
+printcell, printcellstate, printgrid, printgridstate, getmesomegas, gridifystring, stringifygrid, makecontrollist,
+isitnakedsingle, findnakedsingle, ishiddensingle, findhiddensingle, findnakedpair, findhiddenpair, exhaustmethod, solvelegant
+
 # STRUCTS #
 
 
@@ -27,16 +33,7 @@ function iscellbroken(Cell)
 end
 
 
-function iscellsolved(Cell)
-    if count(Cell.candidates) == 1
-        return true
-    else
-        return false
-    end
-end
-
-
-function placesfordigit(digit, unit)
+function placesfordigit(unit, digit)
     places = []
     for i=1:9
         if unit[i].candidates[digit] == true
@@ -55,21 +52,6 @@ function alloweddigits(cell)
         end
     end
     return alloweddigits
-end
-
-
-function setcellvalue(Cell, value)
-    fill!(Cell.candidates, false)
-    Cell.candidates[value] = true
-    return Cell
-end
-
-
-function setemptygrid(Sudoku)
-    for column in 1:9, row in 1:9
-        Sudoku.grid[column, row] = Cell()
-    end
-    return Sudoku
 end
 
 
@@ -138,18 +120,65 @@ function peers(Sudoku, Cell)
 end
 
 
+function isdigitinset(set, digit)
+    for cell in set
+        if cell.candidates[digit] == true
+            return true
+        end
+    end
+    return false
+end
+
+
+function iscellsolved(sudoku, cell)
+    if length(alloweddigits(cell)) != 1
+        return false
+    else
+        digit = alloweddigits(cell)[1]
+        if isdigitinset(peers(sudoku, cell), digit) == true
+            return false
+        else
+            return true
+        end
+    end
+end
+
+
+function setsolvedvalue(cell, value)
+    fill!(cell.candidates, false)
+    cell.candidates[value] = true
+    return cell
+end
+
+
+function setemptygrid(Sudoku)
+    for column in 1:9, row in 1:9
+        Sudoku.grid[column, row] = Cell()
+    end
+    return Sudoku
+end
+
+
+function freedomdegree(sudoku)
+    freedomdegree = 0
+    for cell in sudoku.grid
+        freedomdegree += count(cell.candidates)
+    end
+    return freedomdegree
+end
+
 
 # PRINTING FUNCTIONS #
 
 
-function printcell(Cell)
-    digitofcell = "."
-    if iscellbroken(Cell) == true
-        digitofcell = "!"
-    elseif iscellsolved(Cell) == true
-        digitofcell = findfirst(isequal(true), Cell.candidates)
+function printcell(cell)
+    digit = "."
+    if iscellbroken(cell) == true
+        digit = "!"
+    elseif count(cell.candidates) == 1
+        digit = findfirst(isequal(true), cell.candidates)
     end
-    return digitofcell
+    return digit
 end
 
 
@@ -280,7 +309,7 @@ function getmesomegas(gasname)
 
     001 020 300
     004 050 600
-    007 080 600
+    007 080 900
 
     100 002 030
     045 067 890
@@ -363,7 +392,7 @@ function gridifystring(gridstring::AbstractString)
         currentdigit = gridstring[(r-1)*9+c]
         if occursin(currentdigit, "123456789")
             value = parse(Int64, currentdigit)
-            currentcell = setcellvalue(currentcell, value)
+            currentcell = setsolvedvalue(currentcell, value)
         end
     end
     return somesudoku
@@ -372,10 +401,10 @@ end
 
 function stringifygrid(Sudoku)
     gridstring = "?"^81
-    for r in 1:9, c in 1:9
+    for r=1:9, c=1:9
         currentcell = Sudoku.grid[r, c]
         currentdigit = gridstring[(r-1)*9+c]
-        if iscellsolved(currentcell)
+        if count(currentcell.candidates) == 1
             value = findfirst(isequal(true), currentcell.candidates)
             replace(grindstring, currentdigit => value)
         end
@@ -384,31 +413,112 @@ function stringifygrid(Sudoku)
 end
 
 
+function makecontrollist(Sudoku)
+    controllist = []::Vector
+    for r=1:9, c=1:9
+        currentcell = Sudoku.grid[r, c]
+        append!(controllist, currentcell.candidates)
+    end
+    return controllist
+end
+
+
 # FUNCTIONS OF ELEGANT SOLVING
 
-function findnakedsingle(Sudoku)
-    for r=1:9, c=1:9
-        if iscellsolved(Sudoku.grid[r, c]) == true
-            nakedsingle = Sudoku.grid[r, c]
-            digit = findfirst(isequal(true), nakedsingle)
-            for peer in peers(Sudoku, nakedsingle)
-                peer.candidate[digit] = false
+
+function isitnakedsingle(cell)
+    if length(alloweddigits(cell)) == 1
+        return true
+    else
+        return false
+    end
+end
+
+
+function isnewnakedsingle(sudoku, cell)
+    if iscellsolved(sudoku, cell) == false
+        return true
+    else
+        return false
+    end
+end
+
+
+function updatenakedsingle(sudoku, cell)
+    digit = findfirst(isequal(true), cell.candidates)
+    for peer in peers(sudoku, cell)
+        peer.candidates[digit] = false
+    end
+end
+
+
+function exhaustnakedsingles(sudoku)
+    while true
+        before = freedomdegree(sudoku)
+        for cell in sudoku.grid
+            if isitnakedsingle(cell) && isnewnakedsingle(sudoku, cell)
+                updatenakedsingle(sudoku, cell)
+            end
+        end
+        after = freedomdegree(sudoku)
+        if before == after
+            break
+        end
+    end
+end
+
+
+function isithiddensingle(unit, digit)
+    if length(placesfordigit(unit, digit)) == 1
+        return true
+    else
+        return false
+    end
+end
+
+
+function isnewhiddensingle(sudoku, cell)
+    if iscellsolved(sudoku, cell) == true
+        return false
+    else
+        return true
+    end
+end
+
+
+function updatehiddensingle(sudoku, cell, digit)
+    cell = setsolvedvalue(cell, digit)
+    for peer in peers(sudoku, cell)
+        peer.candidates[digit] = false
+    end
+end 
+
+
+function seekhiddensingle(sudoku)
+    for digit=1:9
+        for unit in everyunit(sudoku)
+            if isithiddensingle(unit, digit) == true
+                cell = unit[placesfordigit(unit, digit)[1]]
+                if isnewhiddensingle(sudoku, cell) == true
+                    updatehiddensingle(sudoku, cell, digit)
+                end
             end
         end
     end
-    return Sudoku
 end
 
 
 function findhiddensingle(Sudoku)
-    for unit in everyunit(Sudoku)
-        for digit in 1:9
-            places = placesfordigit(digit, unit)
-            if length(places) == 1
-                hiddensingle = unit[places.place]
-                hiddensingle = setcellvalue(hiddensingle, digit)
-                # generate list of Peers of hidden single Cell
-                # for every PeerCell set candidates[digit] as false
+    for digit in 1:9
+        for unit in everyunit(Sudoku)
+            places = placesfordigit(unit, digit)
+            if length(places) == 1 && count(unit[places[1]].candidates) > 1
+                hiddensingle = unit[places[1]]
+                hiddensingle = setsolvedvalue(hiddensingle, digit)
+                println("found hidden single")
+                for peer in peers(Sudoku, hiddensingle)
+                    peer.candidates[digit] = false
+                end
             end
         end
     end
@@ -453,29 +563,51 @@ function findhiddenpair(Sudoku)
 end
 
 
-function exhaustmethod(Sudoku, method)
-    before = Sudoku
-    after = nothing
-    swap = nothing
-    while before != after
-        after = method(before)
-        swap = after
-        after = nothing
-        before = swap
-        swap = nothing
+function solveelegant(sudoku)
+    while true
+        before = freedomdegree(sudoku)
+        exhaustnakedsingles(sudoku)
+        still = freedomdegree(sudoku)
+        i = 0
+        while i == 0 && still == before
+            seekhiddensingle(sudoku)
+            still = freedomdegree(sudoku)
+            # try nakedpair
+            # still = freedomdegree(sudoku)
+            # tryhiddenpair
+            # still = freedomdegree(sudoku)
+            # tryxwing
+            i +=1
+        end
+        after = freedomdegree(sudoku)
+        if before == after
+            break
+        end
     end
-    return after
 end
 
 
-function solveelegant(Sudoku)
-    exhaustmethod(Sudoku, findnakedsingle)
-    exhaustmethod(Sudoku, findhiddensingle)
-    exhaustmethod(Sudoku, findnakedpair)
-    exhaustmethod(Sudoku, findhiddenpair)
-    return Sudoku
+# BACKTRACK SOLVING #
+
+function addanchor(Sudoku)
+    # choose random unsolved cell
+    # from allowed cell.candidates choose random candidate
+    # save image of current grid
+    # save anchor as {r=Int, c=Int, v=Int, image = controlsum}
+    # return anchor
 end
 
+
+function backtrack(Sudoku)
+    # propagate as long as possible
+    # anchorsdict = {}
+    # addanchor(Sudoku)
+    # setsolvedvalue(Sudoku.grid[anchor[r], anchor[c]], anchor[v])
+    # propagate as long as you can
+    # if at any point you broke a cell
+    #       reload grid from last anchor image, delete v from grid[r,c].cand
+    # if you cannot propagate longer, add new anchor
+end
 
 
 end #end of module
