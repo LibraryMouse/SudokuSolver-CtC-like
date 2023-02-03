@@ -6,13 +6,13 @@ iscellbroken, iscellsolved, issudokubroken, issudokusolved, freedomdegree,
 alloweddigits, placesfordigit, isdigitinset,
 setcellvalue, setemptygrid,
 printcell, printcellstate, printgrid, printgridstate,
-getmesomegas, gettattoinesunset,
+getmesomegas, gettatooinesunset,
 gridifystring, stringifygrid, 
 savealltostring, savealltovector, reloadfromstring, reloadfromvector,
 exhaustnakedsingles, seekhiddensingle, seeknakedpair,
 setanchor, bifurcate, pullanchor,
 solvenicely, solvedirty, solvefilthy,
-logsolving
+logsolving, presentaftersolving
 
 
 #= STRUCTS =#
@@ -231,6 +231,33 @@ function setemptygrid(sudoku)
         sudoku.grid[column, row] = Cell()
     end
     return sudoku
+end
+
+
+function unsolvedonly(sudoku)
+    unsolved = []
+    for cell in sudoku.grid
+        if count(cell.candidates) > 1
+            push!(unsolved, cell)
+        end
+    end
+    return unsolved
+end
+
+
+function presentaftersolving(sudoku, sudokuname)
+    if issudokusolved(sudoku) == true
+        @printf("Sudoku %s jest rozwiązane!", sudokuname)
+        printgrid(sudoku)
+    elseif issudokubroken == true
+        @printf("Sudoku %s nie jest rozwiązane... i niestety się zepsuło... ale dzięki temu wygląda w środku ciekawie!", sudokuname)
+        printgrid(sudoku)
+        printgridstate(sudoku)
+    else
+        @printf("Sudoku %s nie jest rozwiązane... jeszcze. SudokuSolver nadal jest rozwijany!", sudokuname)
+        printgrid(sudoku)
+        printgridstate(sudoku)
+    end
 end
 
 
@@ -457,8 +484,8 @@ function getmesomegas(gasname)
 end
 
 
-function gettattoinesunset()
-    tattoinesunset = "
+function gettatooinesunset()
+    tatooinesunset = "
     ... ... ...
     ..9 8.. ..7
     .8. .6. .5.
@@ -471,7 +498,7 @@ function gettattoinesunset()
     .4. .5. .6.
     3.. ..6 2..
     "
-    return tattoinesunset
+    return tatooinesunset
 end
 
 
@@ -503,8 +530,7 @@ end
 
 
 function gridifystring(gridstring::AbstractString)
-    somesudoku = Sudoku()
-    somesudoku = setemptygrid(somesudoku)
+    somesudoku = setemptygrid(Sudoku())
     gridstring = simplifygridstring(gridstring)
     for r in 1:9, c in 1:9
         currentcell = somesudoku.grid[r, c]
@@ -600,6 +626,7 @@ function updatenakedsingle(sudoku, cell)
     for peer in peers(sudoku, cell)
         peer.candidates[digit] = false
     end
+    print("NakedSingle; ")
 end
 
 
@@ -642,6 +669,7 @@ function updatehiddensingle(sudoku, cell, digit)
     for peer in peers(sudoku, cell)
         peer.candidates[digit] = false
     end
+    print("HiddenSingle; ")
 end 
 
 
@@ -687,6 +715,7 @@ function updatenakedpair(unit, cell1, cell2)
             cell.candidates[digits[2]] = false
         end
     end
+    print("NakedPair; ")
 end
 
 
@@ -737,18 +766,13 @@ end
 function setanchor(sudoku, allanchors)
     #savedstring = savealltostring(sudoku)
     savedvector = savealltovector(sudoku)
-    anchorc = anchorr = 0
-    while true
-        anchorr = rand(1:9)
-        anchorc = rand(1:9)
-        anchorcell = sudoku.grid[anchorr, anchorc]
-        if count(anchorcell.candidates) > 1
-            break
-        end
-    end
-    value = rand(alloweddigits(sudoku.grid[anchorr, anchorc]))
-    anchor = Dict([("r", anchorr),
-                   ("c", anchorc),
+    anchorcell = rand(unsolvedonly(sudoku))
+    rc = findfirst(isequal(anchorcell), sudoku.grid)
+    r = rc[1]
+    c = rc[2]
+    value = rand(alloweddigits(sudoku.grid[r, c]))
+    anchor = Dict([("r", r),
+                   ("c", c),
                    ("v", value),
                    #("save", savedstring)
                    ("save", savedvector)
@@ -758,11 +782,12 @@ end
 
 
 function bifurcate(sudoku, allanchors, allanswers)
-    # exhaustnakedsingles(sudoku)
+    exhaustnakedsingles(sudoku)
     setanchor(sudoku, allanchors)
     anchor = allanchors[1]
     setcellvalue(sudoku.grid[anchor["r"], anchor["c"]], anchor["v"])
     updatenakedsingle(sudoku, sudoku.grid[anchor["r"], anchor["c"]])
+    println("Bifurcate")
     logsolving(sudoku, allanchors, allanswers)
 end
 
@@ -805,6 +830,24 @@ end
 
 
 function solvedirty(sudoku)
+    allanchors = []
+    allanswers = []
+    # i = 0
+    while issudokusolved(sudoku) == false # && i != 7
+        solvenicely(sudoku)
+         while issudokubroken == true
+            pullanchor(sudoku, allanchors)
+            println("Broken. Pull anchor")
+            logsolving(sudoku, allanchors, allanswers)
+        end
+        bifurcate(sudoku, allanchors, allanswers)
+        while issudokubroken == true
+            pullanchor(sudoku, allanchors)
+            println("Broken. Pull anchor")
+            logsolving(sudoku, allanchors, allanswers)
+        end
+        # i +=1
+    end
 end
 
 
@@ -812,25 +855,29 @@ function solvefilthy(sudoku)
     allanchors = []
     allanswers = []
     while true
-        if issudokusolved == true && length[allanchors] == 0
+        if issudokusolved(sudoku) == true # && length(allanchors) == 0
             break
         end
         bifurcate(sudoku, allanchors, allanswers)
-        if issudokusolved(sudoku) == true
-            push!(allanswers, stringifygrid(sudoku))
-            pullanchor(sudoku, allanchors)
-            logsolving(sudoku, allanchors, allanswers)
-        end
         if issudokubroken(sudoku) == true
-            while true
-                pullanchor(sudoku, allanchors)
+            while issudokubroken(sudoku) == true && length(allanchors) > 0
+                println("Pull anchor bc broken")
                 logsolving(sudoku, allanchors, allanswers)
-                if issudokubroken(sudoku) == true
-                    break
-                end
+                pullanchor(sudoku, allanchors)
+                println("Anchor pulled")
+                logsolving(sudoku, allanchors, allanswers)
             end
         end
-    end
+        if issudokusolved(sudoku) == true
+            println("One answer found!")
+            pullanchor(sudoku, allanchors)
+            push!(allanswers, stringifygrid(sudoku))
+            pullanchor(sudoku, allanchors)
+            println("Pull anchor bc solved")
+            logsolving(sudoku, allanchors, allanswers)
+        end
+   end
+   return allanswers
 end
 
 
