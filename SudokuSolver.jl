@@ -2,11 +2,20 @@ module Tmp
 
 export Cell, Sudoku,
 row, column, box, everyunit, peers,
-iscellbroken, placesfordigit, alloweddigits, isdigitinset, iscellsolved, setsolvedvalue, setemptygrid,
-printcell, printcellstate, printgrid, printgridstate, getmesomegas, gridifystring, stringifygrid, makecontrollist,
-isitnakedsingle, findnakedsingle, ishiddensingle, findhiddensingle, findnakedpair, findhiddenpair, exhaustmethod, solvelegant
+iscellbroken, iscellsolved, issudokubroken, issudokusolved, freedomdegree,
+alloweddigits, placesfordigit, isdigitinset,
+setcellvalue, setemptygrid,
+printcell, printcellstate, printgrid, printgridstate,
+getmesomegas, gettattoinesunset,
+gridifystring, stringifygrid, 
+savealltostring, savealltovector, reloadfromstring, reloadfromvector,
+exhaustnakedsingles, seekhiddensingle, seeknakedpair,
+setanchor, bifurcate, pullanchor,
+solvenicely, solvedirty, solvefilthy,
+logsolving
 
-# STRUCTS #
+
+#= STRUCTS =#
 
 
 struct Cell
@@ -21,90 +30,59 @@ struct Sudoku
 end
 
 
-# BASIC DEFINITIONS #
+#= SPATIAL CONCEPTS =#
 
 
-function iscellbroken(Cell)
-    if any(Cell.candidates) == true
-        return false
-    else
-        return true
-    end
+function row(sudoku, r)
+    return [sudoku.grid[r, 1:9]]
 end
 
 
-function placesfordigit(unit, digit)
-    places = []
-    for i=1:9
-        if unit[i].candidates[digit] == true
-            append!(places, i)
-        end
-    end
-    return places
+function column(sudoku, c)
+    return [sudoku.grid[1:9, c]]
 end
 
 
-function alloweddigits(cell)
-    alloweddigits = []
-    for i=1:9
-        if cell.candidates[i] == true
-            append!(alloweddigits, i)
-        end
-    end
-    return alloweddigits
-end
-
-
-function row(Sudoku, r)
-    return [Sudoku.grid[r, 1:9]]
-end
-
-
-function column(Sudoku, c)
-    return [Sudoku.grid[1:9, c]]
-end
-
-
-function box(Sudoku, b)
+function box(sudoku, b)
     b -= 1
     x = div(b,3)+1
     y = b%3+1
-    a = (x*3)-2
-    b = x*3
-    c = (y*3)-2
-    d = y*3
-    return [Sudoku.grid[a:b, c:d]]
+    r1 = (x*3)-2
+    r2 = x*3
+    c1 = (y*3)-2
+    c2 = y*3
+    return [sudoku.grid[r1:r2, c1:c2]]
 end
 
 
-function everyunit(Sudoku)
+function everyunit(sudoku)
     everyunit = []
     for i=1:9
-        append!(everyunit, row(Sudoku, i))
+        append!(everyunit, row(sudoku, i))
     end
     for i=1:9
-        append!(everyunit, column(Sudoku, i))
+        append!(everyunit, column(sudoku, i))
     end
     for i=1:9
-        append!(everyunit, box(Sudoku, i))
+        append!(everyunit, box(sudoku, i))
     end
     return everyunit
 end
 
 
-function peers(Sudoku, Cell)
+function peers(sudoku, cell)
     peers = []
-    cr = findfirst(isequal(Cell), Sudoku.grid)
+    cr = findfirst(isequal(cell), sudoku.grid)
     c = cr[1]
     r = cr[2]
     for i=1:9
         if i!=c
-            push!(peers, Sudoku.grid[i, r])
+            push!(peers, sudoku.grid[i, r])
         end
     end
     for i=1:9
         if i!=r
-            push!(peers, Sudoku.grid[c, i])
+            push!(peers, sudoku.grid[c, i])
         end
     end
     boxc1 = div((c-1),3)*3+1
@@ -113,10 +91,121 @@ function peers(Sudoku, Cell)
     boxr2 = boxr1+2
     for i=boxc1:boxc2, j=boxr1:boxr2
         if i!=c && j!=r
-            push!(peers, Sudoku.grid[i, j])
+            push!(peers, sudoku.grid[i, j])
         end
     end
     return peers
+end
+
+
+#= BASIC DEFINITIONS =#
+
+
+function iscellbroken(cell)
+    if count(cell.candidates) == 0
+        return true
+    else
+        return false
+    end
+end
+
+
+function iscellsolved(sudoku, cell)
+    if count(cell.candidates) != 1
+        return false
+    else
+        digit = findfirst(isequal(true), cell.candidates)
+        for peer in peers(sudoku, cell)
+            if peer.candidates[digit] == true
+                return false
+            end
+        end
+    end
+    return true
+end
+
+
+function freedomdegree(sudoku)
+    degree = 0
+    for cell in sudoku.grid
+        degree += count(cell.candidates)
+    end
+    # if degree < 81
+    #     sudokubroken = true
+    # end
+    # if degree == 81
+    # end
+    #     sudokusolved = issudokusolved(sudoku)
+    # end
+    return degree
+end
+
+
+function issudokubroken(sudoku)
+    for cell in sudoku.grid
+        if count(cell.candidates) == 0
+            return true
+        end
+    end
+    for unit in everyunit(sudoku)
+        for digit=1:9
+            allowedplaces = 9
+            for cell in unit[1:9]
+                if cell.candidates[digit] == false
+                    allowedplaces -= 1
+                end
+            end
+            if allowedplaces == 0
+                return true
+            end
+        end
+    end
+    return false
+end
+
+
+function issudokusolved(sudoku)
+    for cell in sudoku.grid
+        if count(cell.candidates) != 1
+            return false
+        end
+    end
+    for unit in everyunit(sudoku)
+        for digit=1:9
+            allowedplaces = 0
+            for cell in unit[1:9]
+                if cell.candidates[digit] == true
+                    allowedplaces += 1
+                end
+            end
+            if allowedplaces != 1
+                return false
+            end
+        end
+    end
+    return true
+end
+
+
+function alloweddigits(cell)
+    alloweddigits = []
+    for digit=1:9
+        if cell.candidates[digit] == true
+            append!(alloweddigits, digit)
+        end
+    end
+    return alloweddigits
+end
+
+
+function placesfordigit(unit, digit)
+    allowedplaces = []
+    for place=1:9
+        if unit[place].candidates[digit] == true
+            append!(allowedplaces, place)
+        end
+    end
+    return allowedplaces
 end
 
 
@@ -130,45 +219,23 @@ function isdigitinset(set, digit)
 end
 
 
-function iscellsolved(sudoku, cell)
-    if length(alloweddigits(cell)) != 1
-        return false
-    else
-        digit = alloweddigits(cell)[1]
-        if isdigitinset(peers(sudoku, cell), digit) == true
-            return false
-        else
-            return true
-        end
-    end
-end
-
-
-function setsolvedvalue(cell, value)
+function setcellvalue(cell, value)
     fill!(cell.candidates, false)
     cell.candidates[value] = true
     return cell
 end
 
 
-function setemptygrid(Sudoku)
+function setemptygrid(sudoku)
     for column in 1:9, row in 1:9
-        Sudoku.grid[column, row] = Cell()
+        sudoku.grid[column, row] = Cell()
     end
-    return Sudoku
+    return sudoku
 end
 
 
-function freedomdegree(sudoku)
-    freedomdegree = 0
-    for cell in sudoku.grid
-        freedomdegree += count(cell.candidates)
-    end
-    return freedomdegree
-end
 
-
-# PRINTING FUNCTIONS #
+#= PRINTING =#
 
 
 function printcell(cell)
@@ -182,15 +249,16 @@ function printcell(cell)
 end
 
 
-function printcellstate(Cell)
+function printcellstate(cell)
     state = "123456789"
-    for digit in 1:9
-        if Cell.candidates[digit] == false
+    for digit=1:9
+        if cell.candidates[digit] == false
             state = replace(state, state[digit] => ".")
         end
     end
     return state
 end
+
 
 function printgridrow(Sudoku, row)
     println("|",
@@ -298,65 +366,116 @@ function printgridstate(Sudoku)
 end
 
 
-# SUDOKU FOR TESTS #
+#= SUDOKU FOR TESTS =#
 
 
 function getmesomegas(gasname)
-    gas21 = "
-    000 000 000
-    012 340 560
-    070 800 009
+    gasdict = Dict([
+                   ("gas21", "
+                   000 000 000
+                   012 340 560
+                   070 800 009
 
-    001 020 300
-    004 050 600
-    007 080 900
+                   001 020 300
+                   004 050 600
+                   007 080 900
 
-    100 002 030
-    045 067 890
-    000 000 000
-    "
-    gas40 = "
-    +-----------+
-    |...|123|...|
-    |..2|...|4..|
-    |.1.|4..|.5.|
-    |---+---+---|
-    |2.5|.7.|..6|
-    |3..|842|..7|
-    |4..|.6.|9.8|
-    |---+---+---|
-    |.5.|..6|.9.|
-    |..6|...|8..|
-    |...|789|...|
-    +-----------+
-    "
-    gas90 = "
-    1?2 ?3? 4?5
-    ??? 6?? ???
-    7?? ??8 ??6
+                   100 002 030
+                   045 067 890
+                   000 000 000
+                   "),
+                   ("gas40", "
+                   +-----------+
+                   |...|123|...|
+                   |..2|...|4..|
+                   |.1.|4..|.5.|
+                   |---+---+---|
+                   |2.5|.7.|..6|
+                   |3..|842|..7|
+                   |4..|.6.|9.8|
+                   |---+---+---|
+                   |.5.|..6|.9.|
+                   |..6|...|8..|
+                   |...|789|...|
+                   +-----------+
+                   "),
+                   ("gas90", "
+                   1?2 ?3? 4?5
+                   ??? 6?? ???
+                   7?? ??8 ??6
 
-    ??9 ??? ?2?
-    6?? ??? ??7
-    ?7? ??? 3??
+                   ??9 ??? ?2?
+                   6?? ??? ??7
+                   ?7? ??? 3??
 
-    5?? 7?? ??8
-    ??? ??9 ???
-    4?3 ?2? 1?9
-    "
-    gaslist = ["gas21", "gas40", "gas90"]
-    if gasname == "gas21"
-        return gas21
-    elseif gasname == "gas40"
-        return gas40
-    elseif gasname == "gas90"
-        return gas90
-    else
-        return "I do not have Genuinely Approachable Sudoku you are asking for"
-    end
+                   5?? 7?? ??8
+                   ??? ??9 ???
+                   4?3 ?2? 1?9
+                   "),
+                   ("gas571", "
+                   ... ..2 345
+                   ... .4. ..7
+                   ..6 ..7 ..8
+
+                   ..5 ... ..6
+                   .2. ... .3.
+                   3.. ... 1..
+
+                   7.. 9.. 2..
+                   8.. .3. ...
+                   913 8.. ...
+                   "),
+                   ("gas572", "
+                   2..|.1.|..4
+                   ...|9.2|...
+                   ..8|.7.|3..
+                   ---+---+---
+                   .7.|8.6|.4.
+                   6.9|...|8.5
+                   .5.|7.9|.6.
+                   ---+---+---
+                   ..4|.6.|7..
+                   ...|3.8|...
+                   3..|.2.|..1
+                   "),
+                   ("gas573", "
+                   .12 ... ...
+                   .64 ... .83
+                   ... ..5 .64
+                   
+                   ..3 .8. ...
+                   ... 2.9 ...
+                   ... .1. 7..
+
+                   82. 1.. ...
+                   74. ... 92.
+                   ... ... 65.
+                   ")
+                  ])
+    excuse = "Sorry, I do not have Genuinely Approachable Sudoku you are looking for."
+    return get(gasdict, gasname, excuse)
 end
 
 
-# STRING TO GRID, GRID TO STRING #
+function gettattoinesunset()
+    tattoinesunset = "
+    ... ... ...
+    ..9 8.. ..7
+    .8. .6. .5.
+
+    .5. .4. .3.
+    ..7 9.. ..2
+    ... ... ...
+
+    ..2 7.. ..9
+    .4. .5. .6.
+    3.. ..6 2..
+    "
+    return tattoinesunset
+end
+
+
+#= STRING TO GRID, GRID TO STRING =#
 
 
 function simplifygridstring(gridstring::AbstractString)
@@ -392,38 +511,70 @@ function gridifystring(gridstring::AbstractString)
         currentdigit = gridstring[(r-1)*9+c]
         if occursin(currentdigit, "123456789")
             value = parse(Int64, currentdigit)
-            currentcell = setsolvedvalue(currentcell, value)
+            currentcell = setcellvalue(currentcell, value)
         end
     end
     return somesudoku
 end
 
 
-function stringifygrid(Sudoku)
+function stringifygrid(sudoku)
     gridstring = "?"^81
     for r=1:9, c=1:9
-        currentcell = Sudoku.grid[r, c]
+        currentcell = sudoku.grid[r, c]
         currentdigit = gridstring[(r-1)*9+c]
         if count(currentcell.candidates) == 1
             value = findfirst(isequal(true), currentcell.candidates)
-            replace(grindstring, currentdigit => value)
+            replace(gridstring, currentdigit => value)
         end
     end
     return gridstring
 end
 
 
-function makecontrollist(Sudoku)
-    controllist = []::Vector
-    for r=1:9, c=1:9
-        currentcell = Sudoku.grid[r, c]
-        append!(controllist, currentcell.candidates)
+function savealltostring(sudoku)
+    statestring = "1"^(9*9*9)
+    for r=1:9, c=1:9, v=1:9
+        currentvalue = sudoku.grid[r, c].candidates[v]
+        x = (r-1)*81 + (c-1)*9 + v
+        currentdigit = statestring[x]
+        if currentvalue == false
+            replace(statestring, currentdigit => "0")
+        end
     end
-    return controllist
+    return statestring
 end
 
 
-# FUNCTIONS OF ELEGANT SOLVING
+function reloadfromstring(sudoku, statestring)
+    for r=1:9, c=1:9, v=1:9
+        x = (r-1)*81 + (c-1)*9 + v
+        sudoku.grid[r, c].candidates[v] = parse(Bool, statestring[x])
+    end
+    return sudoku
+end
+
+
+function savealltovector(sudoku)
+    statevector = []::Vector
+    for r=1:9, c=1:9
+        currentcell = sudoku.grid[r, c]
+        append!(statevector, currentcell.candidates)
+    end
+    return statevector
+end
+
+
+function reloadfromvector(sudoku, statevector)
+    for r=1:9, c=1:9, v=1:9
+        x = (r-1)*81 + (c-1)*9 + v
+        sudoku.grid[r, c].candidates[v] = statevector[x]
+    end
+    return sudoku
+end
+
+
+#= SOLVING TECHNIQUES =#
 
 
 function isitnakedsingle(cell)
@@ -487,7 +638,7 @@ end
 
 
 function updatehiddensingle(sudoku, cell, digit)
-    cell = setsolvedvalue(cell, digit)
+    cell = setcellvalue(cell, digit)
     for peer in peers(sudoku, cell)
         peer.candidates[digit] = false
     end
@@ -509,8 +660,8 @@ end
 
 
 function isitnakedpair(cell1, cell2)
-    if cell1 != cell2 && alloweddigits(cell1) == alloweddigits(cell2) &&
-        length(alloweddigits(cell1)) == 2
+    if cell1 != cell2 && count(cell1.candidates) == 2 &&
+        alloweddigits(cell1) == alloweddigits(cell2)
         return true
     else
         return false
@@ -519,14 +670,12 @@ end
 
 
 function isnewnakedpair(unit, cell1, cell2)
-    digits = alloweddigits(cell1)
-    if length(placesfordigit(unit, digits[1])) > 2
-        return true
-    elseif length(placesfordigit(unit, digits[2])) > 2
-        return true
-    else
-        return false
+    for digit in alloweddigits(cell1)
+        if length(placesfordigit(unit, digit)) >= 2
+            return false
+        end
     end
+    return true
 end
 
 
@@ -552,27 +701,6 @@ function seeknakedpair(sudoku)
             end
         end
     end
-end
-
-
-function findnakedpair(Sudoku)
-    for unit in everyunit(Sudoku)
-        for x=1:9,y=1:9 #for every possible pair of cells in unit
-            if x!=y && isequal(unit[x], unit[y]) && count(unit[x].candidates) == 2
-                pair = findall(isequal(true), unit[x].candidates)
-                # delete both pair values from unit cells other than x and y
-                for i=1:9
-                    if i!=x && i!=y
-                        for digit in pair
-                            unit[i].candidates[digit] = false
-                        end
-                    end
-                end
-            end
-        end
-
-    end
-    return Sudoku
 end
 
 
@@ -603,7 +731,56 @@ function findhiddenpair(Sudoku)
 end
 
 
-function solveelegant(sudoku)
+#= BIFURCATING =#
+
+
+function setanchor(sudoku, allanchors)
+    #savedstring = savealltostring(sudoku)
+    savedvector = savealltovector(sudoku)
+    anchorc = anchorr = 0
+    while true
+        anchorr = rand(1:9)
+        anchorc = rand(1:9)
+        anchorcell = sudoku.grid[anchorr, anchorc]
+        if count(anchorcell.candidates) > 1
+            break
+        end
+    end
+    value = rand(alloweddigits(sudoku.grid[anchorr, anchorc]))
+    anchor = Dict([("r", anchorr),
+                   ("c", anchorc),
+                   ("v", value),
+                   #("save", savedstring)
+                   ("save", savedvector)
+                  ])
+    pushfirst!(allanchors, anchor)
+end
+
+
+function bifurcate(sudoku, allanchors, allanswers)
+    # exhaustnakedsingles(sudoku)
+    setanchor(sudoku, allanchors)
+    anchor = allanchors[1]
+    setcellvalue(sudoku.grid[anchor["r"], anchor["c"]], anchor["v"])
+    updatenakedsingle(sudoku, sudoku.grid[anchor["r"], anchor["c"]])
+    logsolving(sudoku, allanchors, allanswers)
+end
+
+
+function pullanchor(sudoku, allanchors)
+    anchor = allanchors[1]
+    #sudoku = reloadfromstring(sudoku, anchor["save"])
+    sudoku = reloadfromvector(sudoku, anchor["save"])
+    anchorcell = sudoku.grid[anchor["r"], anchor["c"]]
+    anchorcell.candidates[anchor["v"]] = false
+    popfirst!(allanchors)
+end
+
+
+# SOLVING FUNCTIONS #
+
+
+function solvenicely(sudoku)
     while true
         before = freedomdegree(sudoku)
         exhaustnakedsingles(sudoku)
@@ -627,26 +804,38 @@ function solveelegant(sudoku)
 end
 
 
-# BACKTRACK SOLVING #
-
-function addanchor(Sudoku)
-    # choose random unsolved cell
-    # from allowed cell.candidates choose random candidate
-    # save image of current grid
-    # save anchor as {r=Int, c=Int, v=Int, image = controlsum}
-    # return anchor
+function solvedirty(sudoku)
 end
 
 
-function backtrack(Sudoku)
-    # propagate as long as possible
-    # anchorsdict = {}
-    # addanchor(Sudoku)
-    # setsolvedvalue(Sudoku.grid[anchor[r], anchor[c]], anchor[v])
-    # propagate as long as you can
-    # if at any point you broke a cell
-    #       reload grid from last anchor image, delete v from grid[r,c].cand
-    # if you cannot propagate longer, add new anchor
+function solvefilthy(sudoku)
+    allanchors = []
+    allanswers = []
+    while true
+        if issudokusolved == true && length[allanchors] == 0
+            break
+        end
+        bifurcate(sudoku, allanchors, allanswers)
+        if issudokusolved(sudoku) == true
+            push!(allanswers, stringifygrid(sudoku))
+            pullanchor(sudoku, allanchors)
+            logsolving(sudoku, allanchors, allanswers)
+        end
+        if issudokubroken(sudoku) == true
+            while true
+                pullanchor(sudoku, allanchors)
+                logsolving(sudoku, allanchors, allanswers)
+                if issudokubroken(sudoku) == true
+                    break
+                end
+            end
+        end
+    end
+end
+
+
+function logsolving(sudoku, allanchors, allanswers)
+    println("freedomdegree: ", freedomdegree(sudoku), "; is broken? ", issudokubroken(sudoku), "; is solved? ", issudokusolved(sudoku), "; anchors: ", length(allanchors), "; answers: ", length(allanswers))
 end
 
 
