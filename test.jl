@@ -1,5 +1,5 @@
-include SudokuSolver.jl
-using Main.Tmp
+include("SudokuSolver.jl")
+using .Tmp
 
 println("Ładuję sudoku GAS21")
 GAS21 = gridifystring(getmesomegas("gas21"))
@@ -45,6 +45,8 @@ catch err
         println("Ehm, ups? Zobaczmy, co się zdążyło rozwiązać...")
     elseif isa(err, MethodError)
         println("Ehm, ups? Zobaczmy, co się zdążyło rozwiązać...")
+    elseif isa(err, LoadError)
+        println("Ehm, ups? Zobaczmy, co się zdążyło rozwiązać...")
     end
 end
 
@@ -63,6 +65,9 @@ catch err
         println("Ehm, ups? Zobaczmy, co się zdążyło rozwiązać...")
     elseif isa(err, MethodError)
         println("Ehm, ups? Zobaczmy, co się zdążyło rozwiązać...")
+    elseif isa(err, LoadError)
+        println("Ehm, ups? Zobaczmy, co się zdążyło rozwiązać...")
+ 
     end
 end
 
@@ -70,5 +75,5 @@ presentaftersolving(tat, "Tatooine Sunset")
 
 println()
 println()
-prinln("Serdecznie zachęcam do wypróbowania modułu na własnych sudoku!
-       Funkcja gridifystring(string) przyjmuje znaki ".", "?" i "0" jako puste pola, cyfry jako cyfry, a wszystkie inne ignoruje, dzięki czemu przyjmuje czytelne dla człowieka ciągi znaków z ramkami i nowymi liniami jako prawidłowy input.")
+println("Serdecznie zachęcam do wypróbowania modułu na własnych sudoku!")
+println("Funkcja gridifystring(string) przyjmuje znaki .?0 jako puste pola, cyfry jako cyfry, a wszystkie inne ignoruje, dzięki czemu przyjmuje czytelne dla człowieka ciągi znaków z ramkami i nowymi liniami jako prawidłowy input.")

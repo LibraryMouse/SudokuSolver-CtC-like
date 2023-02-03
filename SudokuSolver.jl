@@ -247,14 +247,14 @@ end
 
 function presentaftersolving(sudoku, sudokuname)
     if issudokusolved(sudoku) == true
-        @printf("Sudoku %s jest rozwiązane!", sudokuname)
+        println("Sudoku ", sudokuname, " jest rozwiązane!")
         printgrid(sudoku)
     elseif issudokubroken == true
-        @printf("Sudoku %s nie jest rozwiązane... i niestety się zepsuło... ale dzięki temu wygląda w środku ciekawie!", sudokuname)
+        println("Sudoku ", sudokuname, " nie jest rozwiązane... i niestety się zepsuło... ale dzięki temu wygląda w środku ciekawie!")
         printgrid(sudoku)
         printgridstate(sudoku)
     else
-        @printf("Sudoku %s nie jest rozwiązane... jeszcze. SudokuSolver nadal jest rozwijany!", sudokuname)
+        println("Sudoku ", sudokuname, " nie jest rozwiązane... jeszcze. SudokuSolver nadal jest rozwijany!")
         printgrid(sudoku)
         printgridstate(sudoku)
     end
